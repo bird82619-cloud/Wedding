@@ -1,10 +1,20 @@
 import { GoogleGenAI } from "@google/genai";
 import { FormData } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to safely get the AI client
+// We initialize it lazily so the app doesn't crash on startup if the key is missing/undefined
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API_KEY is not set. AI features will not work.");
+    throw new Error("API Key is missing");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const generateEmailSummary = async (data: FormData): Promise<string> => {
   try {
+    const ai = getAiClient();
     const prompt = `
       You are an assistant organizing wedding RSVPs. 
       Format the following data into a clean, easy-to-read summary for the bride and groom.
@@ -57,6 +67,7 @@ export const generateEmailSummary = async (data: FormData): Promise<string> => {
 
 export const generateGuestMessage = async (style: string, guestName: string): Promise<string> => {
   try {
+    const ai = getAiClient();
     let stylePrompt = "";
     // INTENSIFIED STYLES
     switch (style) {
