@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Wedding RSVP App",
   "license": "MIT",
-  "homepage": "https://bird82619-cloud.github.io/Wedding",
+  "homepage": "https://bird82619-cloud.github.io/wedding-rsvp",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -20,7 +20,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
-    "gh-pages": "^6.3.0",
+    "gh-pages": "^6.1.1",
     "typescript": "^5.5.3",
     "vite": "^5.3.4"
   }

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { FormData } from '../types';
 
@@ -8,6 +9,8 @@ interface AdminDashboardProps {
 }
 
 const ADMIN_PASSCODE = 'Rende0619';
+// Use Thumbnail endpoint for better reliability
+const DEFAULT_COVER_IMAGE = 'https://drive.google.com/thumbnail?id=1KDgpd69CoXUg9AMNP89oYyraYo4jLrQ_&sz=w2560';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentImage, onUpdateImage }) => {
   const [data, setData] = useState<FormData[]>([]);
@@ -56,8 +59,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
 
   const handleResetImage = () => {
     localStorage.removeItem('custom_header_image');
-    // Default to file based cover.jpg
-    onUpdateImage('./cover.jpg'); 
+    // Default to the provided Google Drive link
+    onUpdateImage(DEFAULT_COVER_IMAGE); 
   };
 
   const handleConfirmClear = () => {
@@ -118,9 +121,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up the object URL
-    URL.revokeObjectURL(url);
+
+    // 3. Open Email Client
+    setTimeout(() => {
+      const subject = encodeURIComponent("Wedding Guest Data Export");
+      const body = encodeURIComponent("Please see the attached CSV file containing the latest wedding RSVP data.\n\n(Note: You must manually attach the downloaded file to this email).");
+      window.location.href = `mailto:bird82619@gmail.com?subject=${subject}&body=${body}`;
+    }, 1000);
   };
 
   return (
@@ -161,16 +168,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Cover Image Settings</h3>
            
            <div className="bg-blue-50 text-blue-800 p-3 rounded mb-4 text-sm">
-             <p className="font-bold">如何設定全體賓客預設照片 (Setup Global Default Photo):</p>
-             <p>請將您的婚紗照命名為 <code>cover.jpg</code> 並放入專案的 <code>public</code> 資料夾中。</p>
-             <p>Please place a file named <code>cover.jpg</code> in the public folder. It will be used as the default for everyone.</p>
+             <p className="font-bold">預設照片 (Default Photo):</p>
+             <p>目前已設定為使用 Google Drive 連結。</p>
+             <p>Currently using direct link from Google Drive.</p>
            </div>
 
            <div className="flex flex-col md:flex-row gap-6 items-start">
-              <div 
-                className="w-full md:w-64 h-32 bg-cover bg-center rounded-lg border border-gray-200"
-                style={{ backgroundImage: `url('${currentImage}')` }}
-              ></div>
+              {/* Use img tag with no-referrer policy to handle Google Drive links properly */}
+              <div className="w-full md:w-64 h-32 rounded-lg border border-gray-200 overflow-hidden bg-gray-100 relative">
+                 <img 
+                   src={currentImage} 
+                   alt="Header Preview" 
+                   className="w-full h-full object-cover"
+                   referrerPolicy="no-referrer"
+                   onError={(e) => {
+                     // Fallback visualization if broken
+                     e.currentTarget.style.display = 'none';
+                     e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                     if(e.currentTarget.parentElement) {
+                       e.currentTarget.parentElement.innerHTML = '<span class="text-xs text-gray-400">Image not available</span>';
+                     }
+                   }}
+                 />
+              </div>
               <div className="flex-1">
                  <p className="text-sm text-gray-600 mb-2">上傳「僅限這台電腦」看到的暫時預覽圖 (Local Preview Override):</p>
                  <div className="flex items-center gap-3 flex-wrap">
@@ -187,7 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
                     onClick={handleResetImage}
                     className="text-gray-500 hover:text-gray-700 text-sm underline"
                    >
-                     Reset to Default (cover.jpg)
+                     Reset to Default (Google Drive)
                    </button>
                  </div>
                  {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}

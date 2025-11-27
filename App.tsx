@@ -1,14 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
 import { FormCard } from './components/FormCard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { generateGuestMessage } from './services/geminiService';
+import { generateEmailSummary, generateGuestMessage } from './services/geminiService';
 import { FormData, FormStatus } from './types';
 
-// Admin passcode from requirements
+// Target email from requirements
+const TARGET_EMAIL = 'bird82619@gmail.com';
 const ADMIN_PASSCODE = 'Rende0619';
 
 const OPTION_ATTEND = '有事也要前往，排除萬難一定到!';
 const OPTION_NOT_ATTEND = '有事不克前往，但打從心底祝福你們!';
+
+// FIX: Use the thumbnail endpoint with large size (sz=w2560) to bypass some CORS/Hotlink restrictions
+const DEFAULT_COVER_IMAGE = 'https://drive.google.com/thumbnail?id=1KDgpd69CoXUg9AMNP89oYyraYo4jLrQ_&sz=w2560';
 
 // Initial empty state
 const INITIAL_DATA: FormData = {
@@ -28,13 +33,12 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<FormStatus>(FormStatus.IDLE);
   const [showAdmin, setShowAdmin] = useState(false);
   
-  // Update: Default to cover.jpg, fallback to gradient if missing
-  const [headerImage, setHeaderImage] = useState('/Wedding/cover.jpg');
+  // Update: Default to the Google Drive Link provided
+  const [headerImage, setHeaderImage] = useState(DEFAULT_COVER_IMAGE);
   const [imageError, setImageError] = useState(false);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiSource, setAiSource] = useState<'unknown' | 'server' | 'local'>('unknown');
   
   // Admin Login Modal State
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -51,19 +55,6 @@ const App: React.FC = () => {
       setHeaderImage(savedImage);
       setImageError(false); // Reset error if user has a custom override
     }
-    // Probe AI server health on mount to determine which AI source we will use
-    (async () => {
-      try {
-        const res = await fetch('/api/health', { cache: 'no-store' });
-        if (res.ok) {
-          setAiSource('server');
-        } else {
-          setAiSource('local');
-        }
-      } catch (e) {
-        setAiSource('local');
-      }
-    })();
   }, []);
 
   const handleChange = (field: keyof FormData, value: string) => {
@@ -154,12 +145,13 @@ const App: React.FC = () => {
     
     setAiLoading(true);
     try {
-        const msg = await generateGuestMessage(style, formData.fullName);
-        setFormData(prev => ({ ...prev, comments: msg }));
+      // No API call, but we await the local generator which simulates a small delay
+      const msg = await generateGuestMessage(style, formData.fullName);
+      setFormData(prev => ({ ...prev, comments: msg }));
     } catch (e) {
-        console.error('[AI] generateGuestMessage error:', e);
-        // Fallback message if something goes wrong
-        setFormData(prev => ({ ...prev, comments: '祝你們百年好合！' }));
+      console.error(e);
+      // Fallback
+      setFormData(prev => ({ ...prev, comments: "祝仁德&雯惠新婚快樂！" }));
     } finally {
       setAiLoading(false);
     }
@@ -179,6 +171,14 @@ const App: React.FC = () => {
       const list = existing ? JSON.parse(existing) : [];
       list.push(formData);
       localStorage.setItem('wedding_rsvps', JSON.stringify(list));
+
+      // 2. Generate Summary (Local now)
+      const summary = await generateEmailSummary(formData);
+
+      // 3. Open Mail Client
+      const subject = encodeURIComponent(`Wedding RSVP: ${formData.fullName}`);
+      const body = encodeURIComponent(summary);
+      window.location.href = `mailto:${TARGET_EMAIL}?subject=${subject}&body=${body}`;
 
       // Mark as completed
       setStatus(FormStatus.COMPLETED);
@@ -272,7 +272,7 @@ const App: React.FC = () => {
             </svg>
           </div>
           <h2 className="text-2xl font-serif text-gray-800 mb-2">謝謝您的回覆！</h2>
-          <p className="text-gray-600 mb-6">我們已經收到您的出席資訊，感謝您的回應！</p>
+          <p className="text-gray-600 mb-6">我們已經收到您的資訊。Email 客戶端已開啟，請記得點擊發送郵件以完成通知。</p>
           <button 
             onClick={() => {
               setFormData(INITIAL_DATA);
@@ -302,7 +302,8 @@ const App: React.FC = () => {
            <img 
              src={headerImage} 
              alt="Wedding Header" 
-             className="w-full h-full object-cover" 
+             className="w-full h-full object-cover"
+             referrerPolicy="no-referrer"
              onError={() => setImageError(true)}
            />
          )}
@@ -584,9 +585,6 @@ const App: React.FC = () => {
               <div>
                 <h4 className="font-bold text-rose-800 text-lg">AI 創意柴助理</h4>
                 <p className="text-xs text-rose-600">點擊下方按鈕，讓柴柴幫你寫祝福！</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  使用：{aiSource === 'unknown' ? '偵測中...' : aiSource === 'server' ? '伺服器 AI（/api/generate）' : '本地 fallback（無需 API key）'}
-                </p>
               </div>
             </div>
             
@@ -595,6 +593,12 @@ const App: React.FC = () => {
                  { id: 'flower', label: '🌹 上車舞' },
                  { id: 'movie', label: '🎬 電影' },
                  { id: 'slang', label: '🔥 流行語' },
+                 { id: 'chengyu', label: '🧧 成語' },
+                 { id: 'humorous', label: '😆 幽默' },
+                 { id: 'sentimental', label: '🥹 感性' },
+                 { id: 'happy', label: '🎉 熱情' },
+                 { id: 'poem', label: '📜 寫詩' },
+                 { id: 'bullshit', label: '🤥 唬爛' },
                  { id: 'familiar', label: '🤝 裝熟' },
                ].map(style => (
                  <button
