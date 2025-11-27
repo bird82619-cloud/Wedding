@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FormCard } from './components/FormCard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { generateEmailSummary, generateGuestMessage } from './services/geminiService';
+import { generateGuestMessage } from './services/geminiService';
 import { FormData, FormStatus } from './types';
 
-// Target email from requirements
-const TARGET_EMAIL = 'bird82619@gmail.com';
+// Admin passcode from requirements
 const ADMIN_PASSCODE = 'Rende0619';
 
 const OPTION_ATTEND = '有事也要前往，排除萬難一定到!';
@@ -166,14 +165,6 @@ const App: React.FC = () => {
       list.push(formData);
       localStorage.setItem('wedding_rsvps', JSON.stringify(list));
 
-      // 2. Generate Summary
-      const summary = await generateEmailSummary(formData);
-
-      // 3. Open Mail Client
-      const subject = encodeURIComponent(`Wedding RSVP: ${formData.fullName}`);
-      const body = encodeURIComponent(summary);
-      window.location.href = `mailto:${TARGET_EMAIL}?subject=${subject}&body=${body}`;
-
       // Mark as completed
       setStatus(FormStatus.COMPLETED);
     } catch (e) {
@@ -266,7 +257,7 @@ const App: React.FC = () => {
             </svg>
           </div>
           <h2 className="text-2xl font-serif text-gray-800 mb-2">謝謝您的回覆！</h2>
-          <p className="text-gray-600 mb-6">我們已經收到您的資訊。Email 客戶端已開啟，請記得點擊發送郵件以完成通知。</p>
+          <p className="text-gray-600 mb-6">我們已經收到您的出席資訊，感謝您的回應！</p>
           <button 
             onClick={() => {
               setFormData(INITIAL_DATA);
