@@ -4,14 +4,16 @@ import { FormData } from "../types";
 // Helper to safely get the AI client
 // We initialize it lazily so the app doesn't crash on startup if the key is missing/undefined
 const getAiClient = () => {
-  // Try multiple sources for the API key
+  // Try multiple sources for the API key (in priority order)
   const apiKey = 
-    (window as any).VITE_API_KEY ||  // From HTML global variable (production)
+    (window as any).API_CONFIG?.VITE_API_KEY ||  // From api-config.js (loaded in <head>)
+    (window as any).VITE_API_KEY ||  // Fallback: direct global variable
     (import.meta as any).env.VITE_API_KEY ||  // From Vite env
     process.env.VITE_API_KEY;  // From process env (development)
   
   if (!apiKey) {
-    console.warn("VITE_API_KEY is not set. AI features will not work.", {
+    console.error("VITE_API_KEY is not set. AI features will not work.", {
+      apiConfigKey: (window as any).API_CONFIG?.VITE_API_KEY,
       windowKey: (window as any).VITE_API_KEY,
       importMeta: (import.meta as any).env.VITE_API_KEY,
       processEnv: process.env.VITE_API_KEY
@@ -19,7 +21,12 @@ const getAiClient = () => {
     throw new Error("API Key is missing");
   }
   
-  console.log("Using API Key for Gemini service");
+  console.log("[Gemini] Using API Key from:", 
+    (window as any).API_CONFIG?.VITE_API_KEY ? "API_CONFIG" :
+    (window as any).VITE_API_KEY ? "window.VITE_API_KEY" :
+    (import.meta as any).env.VITE_API_KEY ? "import.meta.env" :
+    "process.env"
+  );
   return new GoogleGenAI({ apiKey });
 };
 
