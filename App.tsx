@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormCard } from './components/FormCard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { generateGuestMessage, detectApiKeySource } from './services/geminiService';
+import { generateGuestMessage } from './services/geminiService';
 import { FormData, FormStatus } from './types';
 
 // Admin passcode from requirements
@@ -34,6 +34,7 @@ const App: React.FC = () => {
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiSource, setAiSource] = useState<'unknown' | 'server' | 'local'>('unknown');
   
   // Admin Login Modal State
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -50,6 +51,19 @@ const App: React.FC = () => {
       setHeaderImage(savedImage);
       setImageError(false); // Reset error if user has a custom override
     }
+    // Probe AI server health on mount to determine which AI source we will use
+    (async () => {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        if (res.ok) {
+          setAiSource('server');
+        } else {
+          setAiSource('local');
+        }
+      } catch (e) {
+        setAiSource('local');
+      }
+    })();
   }, []);
 
   const handleChange = (field: keyof FormData, value: string) => {
@@ -140,32 +154,12 @@ const App: React.FC = () => {
     
     setAiLoading(true);
     try {
-        // Log and show info about API key source for debugging
-        try {
-          const info = detectApiKeySource();
-          console.log('[DEBUG] API key source:', info.source, 'masked:', info.masked);
-          if (!info.source) {
-            alert('AI 功能目前無法使用：找不到 API Key（請稍候或聯絡管理員）');
-            setAiLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn('[DEBUG] detectApiKeySource failed', err);
-        }
-
         const msg = await generateGuestMessage(style, formData.fullName);
         setFormData(prev => ({ ...prev, comments: msg }));
     } catch (e) {
         console.error('[AI] generateGuestMessage error:', e);
-        // Show clearer message depending on error
-        const errMsg = (e instanceof Error) ? e.message : String(e);
-        if (errMsg === 'NO_API_KEY') {
-          alert('AI Key 不存在或載入失敗（請稍後或重新整理頁面）');
-        } else if (errMsg === 'AI_ERROR') {
-          alert('AI 產生失敗，伺服器回應異常，請稍後再試');
-        } else {
-          alert('AI 產生失敗，請檢查開發者主控台 (Console) 以獲得詳細資訊');
-        }
+        // Fallback message if something goes wrong
+        setFormData(prev => ({ ...prev, comments: '祝你們百年好合！' }));
     } finally {
       setAiLoading(false);
     }
@@ -590,6 +584,9 @@ const App: React.FC = () => {
               <div>
                 <h4 className="font-bold text-rose-800 text-lg">AI 創意柴助理</h4>
                 <p className="text-xs text-rose-600">點擊下方按鈕，讓柴柴幫你寫祝福！</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  使用：{aiSource === 'unknown' ? '偵測中...' : aiSource === 'server' ? '伺服器 AI（/api/generate）' : '本地 fallback（無需 API key）'}
+                </p>
               </div>
             </div>
             
@@ -598,13 +595,6 @@ const App: React.FC = () => {
                  { id: 'flower', label: '🌹 上車舞' },
                  { id: 'movie', label: '🎬 電影' },
                  { id: 'slang', label: '🔥 流行語' },
-                 { id: 'chengyu', label: '🧧 成語' },
-                 { id: 'humorous', label: '😆 幽默' },
-                 { id: 'sentimental', label: '🥹 感性' },
-                 { id: 'happy', label: '🎉 熱情' },
-                 { id: 'poem', label: '📜 寫詩' },
-                 { id: 'rap', label: '🎤 Rap' },
-                 { id: 'bullshit', label: '🤥 唬爛' },
                  { id: 'familiar', label: '🤝 裝熟' },
                ].map(style => (
                  <button

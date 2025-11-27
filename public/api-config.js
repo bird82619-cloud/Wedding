@@ -1,19 +1,8 @@
-// API Configuration - Loaded before React
-// This ensures the API key is available immediately
-(function() {
-  const apiKey = 'AIzaSyBEKk4tFXgURUB0S-hQDalYZ0UyN0VTGx8';
-  
-  window.API_CONFIG = {
-    VITE_API_KEY: apiKey
-  };
-  
-  // Also set as direct global for easier access
-  window.VITE_API_KEY = apiKey;
-  
-  console.log('[API-CONFIG] Initialized', {
-    hasAPIConfig: !!window.API_CONFIG,
-    hasVITE_API_KEY: !!window.VITE_API_KEY,
-    keyLength: apiKey.length,
-    keyPreview: apiKey.substring(0, 10) + '...'
-  });
-})();
+// API config removed for security.
+// Do NOT store API keys in client-side files. This placeholder exists so builds that
+// expect /api-config.js won't fail. Deploy a server-side proxy that holds the
+// real API key in environment variables instead.
+// Example: use a server endpoint POST /api/generate which accepts {style, guestName}
+// and returns { text }
+
+console.warn('[API-CONFIG] Removed client-side API key for security.');
