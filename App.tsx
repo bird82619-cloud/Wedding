@@ -6,7 +6,7 @@ import { FormData, FormStatus } from './types';
 
 // Target email from requirements
 const TARGET_EMAIL = 'bird82619@gmail.com';
-const ADMIN_PASSCODE = '82619'; // Simple passcode for the owner
+const ADMIN_PASSCODE = 'Rende0619';
 
 const OPTION_ATTEND = '有事也要前往，排除萬難一定到!';
 const OPTION_NOT_ATTEND = '有事不克前往，但打從心底祝福你們!';
@@ -31,11 +31,16 @@ const App: React.FC = () => {
   const [headerImage, setHeaderImage] = useState('1.png');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [shibaAnimating, setShibaAnimating] = useState(false);
+  
+  // Admin Login Modal State
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
 
-  // Load header image
+  // State to track which fields are in "Custom Input" mode explicitly
+  const [customInputModes, setCustomInputModes] = useState<Record<string, boolean>>({});
+
+  // Load header image & data
   useEffect(() => {
     const savedImage = localStorage.getItem('custom_header_image');
     if (savedImage) {
@@ -51,6 +56,14 @@ const App: React.FC = () => {
       setValidationErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[field];
+        return newErrors;
+      });
+    }
+    // Also clear the specific combo error if present
+    if (validationErrors.generalCombo) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.generalCombo;
         return newErrors;
       });
     }
@@ -99,6 +112,14 @@ const App: React.FC = () => {
       if (totalVeg > totalAttendees) {
         errors.vegetarianCount = `素食餐點數量 (${totalVeg}) 不可大於出席人數 (${totalAttendees})`;
       }
+
+      // 9. Combined Logic (User Request: Children + Veg <= Attendees)
+      if ((totalChildren + totalVeg) > totalAttendees) {
+        const msg = "防呆機制：(兒童座椅 + 素食) 總和不可大於出席總人數";
+        // Show error on both fields to ensure visibility
+        errors.vegetarianCount = msg;
+        errors.childSeats = msg;
+      }
     }
 
     setValidationErrors(errors);
@@ -108,19 +129,11 @@ const App: React.FC = () => {
   const handleAiGenerate = async (style: string) => {
     if (!formData.fullName) {
       setValidationErrors(prev => ({...prev, fullName: "請先輸入姓名以產生專屬祝福"}));
+      // Scroll to name field
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    // show a short toast immediately and play sound/animate for the 'flower' style
-    if (style === 'flower') {
-      setToastMessage('上車舞已為您準備好！');
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
-      // play a short pop sound
-      try { playShibaSound(); } catch (e) { /* ignore audio errors */ }
-      // trigger a small animation on textarea
-      setShibaAnimating(true);
-      setTimeout(() => setShibaAnimating(false), 700);
-    }
+    
     setAiLoading(true);
     try {
       const msg = await generateGuestMessage(style, formData.fullName);
@@ -133,33 +146,8 @@ const App: React.FC = () => {
     }
   };
 
-  // Play a short pluck/pop sound using the Web Audio API
-  const playShibaSound = () => {
-    const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(600, ctx.currentTime);
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    g.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    o.stop(ctx.currentTime + 0.45);
-    // close context after a short delay where supported
-    setTimeout(() => { try { ctx.close(); } catch (e) {} }, 800);
-  };
-
   const handleSubmit = async () => {
     if (!validate()) {
-      // Find the first error and scroll to it
-      const firstErrorKey = Object.keys(validationErrors)[0];
-      if (firstErrorKey) {
-         // Simple scroll to top if error exists
-      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -189,6 +177,17 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAdminLogin = () => {
+    if (passwordInput === ADMIN_PASSCODE) {
+      setShowAdmin(true);
+      setShowPasswordModal(false);
+      setPasswordInput('');
+      setLoginError('');
+    } else {
+      setLoginError('密碼錯誤 (Incorrect Password)');
+    }
+  };
+
   /**
    * Helper to render a Select with an "Other" option that triggers a text input.
    */
@@ -197,9 +196,11 @@ const App: React.FC = () => {
     options: string[], 
     placeholder: string = "請輸入數量"
   ) => {
-    // Check if the current value is one of the predefined options
-    const isCustom = !options.includes(formData[field]) && formData[field] !== '';
-    const selectValue = isCustom ? 'custom' : formData[field];
+    const val = formData[field];
+    
+    // Determine if we are in custom mode.
+    const isCustom = customInputModes[field] ?? (!options.includes(val) && val !== '');
+    const selectValue = isCustom ? 'custom' : val;
 
     return (
       <div className="space-y-2">
@@ -207,11 +208,13 @@ const App: React.FC = () => {
           className={`w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 focus:bg-white focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition-all ${validationErrors[field] ? 'border-red-300 bg-red-50' : ''}`}
           value={selectValue}
           onChange={(e) => {
-            const val = e.target.value;
-            if (val === 'custom') {
-              handleChange(field, ''); // Clear value for custom input
+            const newVal = e.target.value;
+            if (newVal === 'custom') {
+              setCustomInputModes(prev => ({...prev, [field]: true}));
+              handleChange(field, ''); // Clear value to let user type
             } else {
-              handleChange(field, val);
+              setCustomInputModes(prev => ({...prev, [field]: false}));
+              handleChange(field, newVal);
             }
           }}
         >
@@ -219,7 +222,8 @@ const App: React.FC = () => {
           <option value="custom">Other (自填)</option>
         </select>
 
-        {(isCustom || selectValue === 'custom') && (
+        {/* Show input if custom mode is active */}
+        {isCustom && (
           <input 
             type="number"
             min="0"
@@ -253,6 +257,7 @@ const App: React.FC = () => {
             onClick={() => {
               setFormData(INITIAL_DATA);
               setStatus(FormStatus.IDLE);
+              setCustomInputModes({});
             }}
             className="text-rose-500 hover:text-rose-600 underline font-medium"
           >
@@ -265,15 +270,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-12 fade-in relative">
-      {/* Inline styles for toast fade and shiba animation (scoped here) */}
-      <style>{`
-        .shiba-toast-enter{ opacity:0; transform:translateY(-6px) scale(0.98);} 
-        .shiba-toast-enter-active{ opacity:1; transform:none; transition: all 220ms ease-out; }
-        .shiba-toast-exit{ opacity:1; } 
-        .shiba-toast-exit-active{ opacity:0; transition: opacity 220ms ease-in; }
-        @keyframes shiba-pop { 0%{ transform: translateY(0) scale(1);} 30%{ transform: translateY(-6px) scale(1.04);} 100%{ transform: translateY(0) scale(1);} }
-        .shiba-hit { animation: shiba-pop 700ms cubic-bezier(.2,.9,.3,1); }
-      `}</style>
       {/* Header Image */}
       <div className="relative h-64 md:h-80 bg-gray-200 overflow-hidden shadow-sm">
          {headerImage === '1.png' ? (
@@ -289,15 +285,95 @@ const App: React.FC = () => {
 
       <div className="max-w-2xl mx-auto -mt-10 px-4 relative z-10">
         <div className="bg-white rounded-xl shadow-xl p-8 mb-6 text-center border-t-4 border-rose-400">
-          <h1 className="text-3xl md:text-4xl font-serif text-gray-800 mb-4">仁德 & 雯惠<br/><span className="text-2xl">婚禮出席調查</span></h1>
+          <h1 className="text-3xl md:text-4xl font-serif text-gray-800 mb-4 flex items-center justify-center flex-wrap gap-2">
+            <span>仁德</span>
+            {/* 3D Platinum Interlocking Rings */}
+            <span className="relative inline-flex items-center justify-center w-14 h-14 mx-1">
+              <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="transform -rotate-12 drop-shadow-md">
+                <defs>
+                  <linearGradient id="platinumGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#F8FAFC" /> {/* Light Silver */}
+                    <stop offset="25%" stopColor="#E2E8F0" />
+                    <stop offset="50%" stopColor="#94A3B8" /> {/* Darker Silver for depth */}
+                    <stop offset="75%" stopColor="#E2E8F0" />
+                    <stop offset="100%" stopColor="#F1F5F9" />
+                  </linearGradient>
+                  <filter id="ringGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  <linearGradient id="highlight" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="white" stopOpacity="0" />
+                    <stop offset="50%" stopColor="white" stopOpacity="0.9" />
+                    <stop offset="100%" stopColor="white" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Left Ring (Bottom Layer) */}
+                <path 
+                  d="M20 35 A 18 18 0 1 1 56 35 A 18 18 0 1 1 20 35 Z" 
+                  fill="none" 
+                  stroke="url(#platinumGradient)" 
+                  strokeWidth="6" 
+                />
+                <path 
+                  d="M20 35 A 18 18 0 1 1 56 35 A 18 18 0 1 1 20 35 Z" 
+                  fill="none" 
+                  stroke="url(#highlight)" 
+                  strokeWidth="2" 
+                  opacity="0.6"
+                />
+
+                {/* Right Ring (Top Layer, Interlocking effect) */}
+                <path 
+                  d="M44 35 A 18 18 0 1 1 80 35 A 18 18 0 1 1 44 35 Z" 
+                  fill="none" 
+                  stroke="url(#platinumGradient)" 
+                  strokeWidth="6" 
+                />
+                 <path 
+                  d="M44 35 A 18 18 0 1 1 80 35 A 18 18 0 1 1 44 35 Z" 
+                  fill="none" 
+                  stroke="url(#highlight)" 
+                  strokeWidth="2" 
+                  opacity="0.6"
+                />
+
+                {/* Visual Fix for Interlocking: Draw a small segment of Left Ring ON TOP of Right Ring at the bottom intersection */}
+                <path 
+                  d="M38 52 A 18 18 0 0 0 49 48" 
+                  fill="none" 
+                  stroke="url(#platinumGradient)" 
+                  strokeWidth="6" 
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <span>雯惠</span>
+            <span className="text-2xl w-full block mt-2 text-gray-600">婚禮出席調查</span>
+          </h1>
           <div className="h-1 w-20 bg-rose-200 mx-auto mb-6"></div>
           
           <div className="text-gray-700 leading-relaxed space-y-4 font-light text-justify md:text-center">
             <p>致親愛的好友們～</p>
-            <p>是的，經過一千多個日子的相處與陪伴，<br className="hidden md:block"/>我們決定執起彼此的手，步入人生另一個階段。</p>
+            <p>是的，經過兩千多個日子的相處與陪伴，<br className="hidden md:block"/>我們決定執起彼此的手，步入人生另一個階段。</p>
             <div className="py-2">
               <p className="font-bold text-rose-600 text-lg">2026/5/16（六）</p>
-              <p className="font-bold text-gray-800">於 桃園彭園八德館 舉辦午宴</p>
+              <p className="font-bold text-gray-800 flex items-center justify-center gap-1 flex-wrap mt-1">
+                於 
+                <a 
+                  href="https://www.google.com/maps/search/?api=1&query=桃園彭園八德館" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-rose-600 hover:text-rose-800 transition-colors inline-flex items-center border-b border-rose-300 hover:border-rose-600 pb-0.5 mx-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  桃園彭園八德館
+                </a>
+                舉辦午宴
+              </p>
             </div>
             <p>誠摯邀請您前來一同分享我們的喜悅，<br className="hidden md:block"/>讓這個充滿意義的日子更加幸福！</p>
             <p>請動動手指幫我們填入以下資訊，期待您的蒞臨❤</p>
@@ -383,9 +459,9 @@ const App: React.FC = () => {
           </FormCard>
 
           <div className="grid grid-cols-1 gap-4">
-             {/* 6. Attendee Count */}
+             {/* 6. Attendee Count (Changed placeholder as requested) */}
              <FormCard title="6. 出席人數" required error={validationErrors.attendeeCount}>
-                {renderSelectWithOther('attendeeCount', ['1', '2', '3'])}
+                {renderSelectWithOther('attendeeCount', ['1', '2', '3'], '請輸入人數')}
              </FormCard>
 
              {/* 7. Child Seats */}
@@ -403,107 +479,195 @@ const App: React.FC = () => {
         {/* AI Message Generator */}
         <FormCard title="給新人的祝福 / Message to Couple">
           <div className="mb-4 bg-rose-50 p-4 rounded-lg border border-rose-100">
-            <p className="text-sm text-rose-800 font-medium mb-2 flex items-center gap-2">
-              <img src="/shiba-dice.svg" alt="柴犬抱骰子" className="w-5 h-5 inline-block" />
-              AI 創意柴助理
-            </p>
-            <p className="text-xs text-rose-600 mb-3">不知道該寫什麼嗎？點擊按鈕讓 AI 幫您產生專屬祝福（每次點擊都會產生不同內容）：</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'happy', label: '🎉 熱情奔放' },
-                { id: 'sentimental', label: '💕 感性浪漫' },
-                { id: 'humorous', label: '🤣 幽默搞笑' },
-                { id: 'poem', label: '📜 文藝詩詞' },
-                { id: 'movie', label: '🎬 電影台詞' },
-                { id: 'slang', label: '😎 網路流行' },
-                { id: 'chengyu', label: '🧧 成語連發' },
-                { id: 'rap', label: '🎤 帥氣饒舌' },
-                { id: 'flower', label: '🌹 上車舞' },
-              ].map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => handleAiGenerate(s.id)}
-                  disabled={aiLoading}
-                  className="px-3 py-1.5 bg-white text-rose-600 border border-rose-200 rounded-md text-xs font-medium hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-wait"
-                >
-                  {s.label}
-                </button>
-              ))}
+            <div className="flex items-center mb-3">
+              {/* Red Shiba with 3D Dice */}
+              <div className="mr-3 flex-shrink-0">
+                <svg width="72" height="72" viewBox="0 0 100 100" className="drop-shadow-sm overflow-visible">
+                  <defs>
+                     {/* 3D Dice Gradients */}
+                     <linearGradient id="diceTop" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#FFFFFF" />
+                        <stop offset="100%" stopColor="#F3F4F6" />
+                     </linearGradient>
+                     <linearGradient id="diceLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#E5E7EB" />
+                        <stop offset="100%" stopColor="#D1D5DB" />
+                     </linearGradient>
+                     <linearGradient id="diceRight" x1="100%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#D1D5DB" />
+                        <stop offset="100%" stopColor="#9CA3AF" />
+                     </linearGradient>
+                  </defs>
+
+                  {/* Red Shiba Head (Akita/Shiba Color) */}
+                  <g transform="translate(0, 5)">
+                    {/* Ears */}
+                    <path d="M25 35 Q20 15 35 25" fill="#D97706" stroke="#B45309" strokeWidth="1.5" strokeLinejoin="round" /> {/* Amber-600 */}
+                    <path d="M75 35 Q80 15 65 25" fill="#D97706" stroke="#B45309" strokeWidth="1.5" strokeLinejoin="round" />
+                    
+                    {/* Face Shape */}
+                    <ellipse cx="50" cy="55" rx="32" ry="30" fill="#FFF7ED" stroke="#B45309" strokeWidth="1.5" /> {/* Cream face */}
+                    
+                    {/* Red Fur Pattern (Forehead & Cheeks) */}
+                    <path d="M30 40 Q50 30 70 40 Q80 55 75 70 L25 70 Q20 55 30 40" fill="#D97706" opacity="0.9" />
+                    
+                    {/* White Eyebrows */}
+                    <ellipse cx="36" cy="42" rx="3" ry="1.5" fill="white" opacity="0.8" transform="rotate(-10)" />
+                    <ellipse cx="64" cy="42" rx="3" ry="1.5" fill="white" opacity="0.8" transform="rotate(10)" />
+
+                    {/* Cheek Blush */}
+                    <circle cx="28" cy="62" r="5" fill="#FDA4AF" opacity="0.6" />
+                    <circle cx="72" cy="62" r="5" fill="#FDA4AF" opacity="0.6" />
+                    
+                    {/* Eyes */}
+                    <circle cx="38" cy="54" r="3.5" fill="#374151" />
+                    <circle cx="62" cy="54" r="3.5" fill="#374151" />
+                    
+                    {/* Snout */}
+                    <ellipse cx="50" cy="66" rx="10" ry="8" fill="white" />
+                    <path d="M47 63 L53 63 L50 67 Z" fill="#1F2937" strokeLinejoin="round" />
+                    <path d="M47 69 Q50 72 53 69" fill="none" stroke="#1F2937" strokeWidth="1.5" strokeLinecap="round" />
+                  </g>
+                  
+                  {/* 3D Dice (Isometric Cube) */}
+                  <g transform="translate(62, 58) scale(0.9)">
+                     {/* Top Face */}
+                     <path d="M15 0 L30 8 L15 16 L0 8 Z" fill="url(#diceTop)" stroke="#E5E7EB" strokeWidth="0.5" />
+                     {/* Left Face */}
+                     <path d="M0 8 L15 16 V32 L0 24 Z" fill="url(#diceLeft)" stroke="#E5E7EB" strokeWidth="0.5" />
+                     {/* Right Face */}
+                     <path d="M15 16 L30 8 V24 L15 32 Z" fill="url(#diceRight)" stroke="#E5E7EB" strokeWidth="0.5" />
+                     
+                     {/* Dots (Red for 1 on Top) */}
+                     <circle cx="15" cy="8" r="2.5" fill="#DC2626" />
+                     
+                     {/* Dots (2 on Right Face) */}
+                     <circle cx="19" cy="15" r="1.5" fill="#374151" opacity="0.7" transform="skewY(30)"/> 
+                     <circle cx="26" cy="19" r="1.5" fill="#374151" opacity="0.7" transform="skewY(30)"/>
+
+                     {/* Dots (3 on Left Face) */}
+                     <circle cx="4" cy="15" r="1.5" fill="#374151" opacity="0.7" transform="skewY(-30)"/>
+                     <circle cx="7.5" cy="20" r="1.5" fill="#374151" opacity="0.7" transform="skewY(-30)"/>
+                     <circle cx="11" cy="25" r="1.5" fill="#374151" opacity="0.7" transform="skewY(-30)"/>
+                  </g>
+
+                  {/* Paws */}
+                  <ellipse cx="58" cy="80" rx="5" ry="4" fill="#FFF7ED" stroke="#D97706" strokeWidth="1" />
+                  <ellipse cx="78" cy="82" rx="5" ry="4" fill="#FFF7ED" stroke="#D97706" strokeWidth="1" transform="rotate(-10)" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-bold text-rose-800 text-lg">AI 創意柴助理</h4>
+                <p className="text-xs text-rose-600">點擊下方按鈕，讓柴柴幫你寫祝福！</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2 mb-2">
+               {[
+                 { id: 'flower', label: '🌹 上車舞' },
+                 { id: 'movie', label: '🎬 電影' },
+                 { id: 'slang', label: '🔥 流行語' },
+                 { id: 'chengyu', label: '🧧 成語' },
+                 { id: 'humorous', label: '😆 幽默' },
+                 { id: 'sentimental', label: '🥹 感性' },
+                 { id: 'happy', label: '🎉 熱情' },
+                 { id: 'poem', label: '📜 寫詩' },
+                 { id: 'rap', label: '🎤 Rap' },
+                 { id: 'bullshit', label: '🤥 唬爛' },
+                 { id: 'familiar', label: '🤝 裝熟' },
+               ].map(style => (
+                 <button
+                   key={style.id}
+                   onClick={() => handleAiGenerate(style.id)}
+                   disabled={aiLoading}
+                   className="bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 hover:text-rose-700 hover:scale-105 transition-all py-1.5 px-1 rounded-md text-xs md:text-sm font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   {style.label}
+                 </button>
+               ))}
             </div>
           </div>
-          <div className="relative">
-             <textarea 
-                className="w-full bg-gray-50 border-gray-200 border rounded-lg px-4 py-3 focus:bg-white focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition-all h-32 resize-none"
-                placeholder="寫下您對新人的祝福..."
-                value={formData.comments}
-                onChange={(e) => handleChange('comments', e.target.value)}
-              />
-              {aiLoading && (
-                <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-lg">
-                   <div className="flex items-center space-x-2 text-rose-500">
-                     <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                     </svg>
-                     <span className="text-sm font-medium">AI 正在撰寫中...</span>
-                   </div>
-                </div>
-              )}
-          </div>
+
+          <textarea 
+            className="w-full h-32 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 focus:bg-white focus:ring-2 focus:ring-rose-200 focus:border-rose-400 outline-none transition-all resize-none"
+            placeholder="請輸入給新人的祝福話語..."
+            value={formData.comments}
+            onChange={(e) => handleChange('comments', e.target.value)}
+          />
+          {aiLoading && <p className="text-xs text-rose-500 mt-2 animate-pulse">✨ 柴柴正在努力思考中...</p>}
         </FormCard>
 
+        {/* Submit */}
         <button 
           onClick={handleSubmit}
           disabled={status === FormStatus.PROCESSING}
-          className="w-full bg-rose-600 text-white font-serif text-lg py-4 rounded-xl shadow-lg hover:bg-rose-700 hover:shadow-xl transition-all transform active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+          className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg transform transition-all active:scale-95 flex items-center justify-center
+            ${status === FormStatus.PROCESSING ? 'bg-gray-400 cursor-not-allowed' : 'bg-rose-500 hover:bg-rose-600'}`}
         >
           {status === FormStatus.PROCESSING ? (
-            <>
+            <span className="flex items-center">
               <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span>處理中...</span>
-            </>
-          ) : (
-             <span>送出回覆 / Submit</span>
-          )}
+              處理中...
+            </span>
+          ) : '確認送出 (Send RSVP)'}
         </button>
-        
-        <p className="text-center text-gray-400 text-xs mt-6 pb-4">
-          © 2024 Wedding RSVP.
-        </p>
-
       </div>
 
-      {/* Toast */}
-      {showToast && (
-        <div className="fixed top-4 right-4 bg-rose-600 text-white px-4 py-2 rounded-md shadow-lg z-50 shiba-toast-enter-active">
-          {toastMessage}
+      {/* Admin Login Modal (Triggered by Lock Button) */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xs border border-gray-200">
+            <h3 className="text-lg font-serif text-gray-800 mb-2">管理員登入</h3>
+            <p className="text-sm text-gray-500 mb-4">請輸入密碼以進入後台。</p>
+            
+            <input
+              type="password"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-2 focus:ring-2 focus:ring-rose-300 outline-none"
+              placeholder="Password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoFocus
+            />
+            {loginError && <p className="text-red-500 text-xs mb-3">{loginError}</p>}
+            
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordInput('');
+                  setLoginError('');
+                }}
+                className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAdminLogin}
+                className="flex-1 bg-gray-800 text-white font-medium py-2 rounded-lg hover:bg-black transition-colors"
+              >
+                登入
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* small animation overlay applied to textarea when shiba activates */}
-      {shibaAnimating && (
-        <div aria-hidden className="pointer-events-none fixed inset-0 flex items-center justify-center z-40">
-          <div className="w-40 h-40 rounded-full opacity-10 bg-rose-400 shiba-hit" />
-        </div>
-      )}
-
-      {/* Admin Login Button - Repositioned to Bottom Right with Lock Icon */}
-      <button 
-        className="fixed bottom-2 right-2 p-2 opacity-[0.02] hover:opacity-100 transition-opacity duration-300 z-50 text-gray-700 bg-white/50 rounded-full hover:bg-white hover:shadow-md"
-        title="Admin Access"
-        onClick={() => {
-          const pwd = prompt("Admin Password:");
-          if (pwd === ADMIN_PASSCODE) setShowAdmin(true);
-        }}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-        </svg>
-      </button>
-
+      {/* Small, almost invisible Admin Lock Button at bottom right */}
+      <div className="fixed bottom-2 right-2 z-50">
+         <button
+            onClick={() => setShowPasswordModal(true)}
+            className="bg-gray-800 text-white rounded-full p-2 opacity-[0.02] hover:opacity-50 transition-all duration-300 shadow-sm"
+            style={{ transform: 'scale(0.4)' }}
+            aria-label="Admin Access"
+         >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+         </button>
+      </div>
     </div>
   );
 };
