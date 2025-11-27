@@ -67,6 +67,11 @@ export const generateEmailSummary = async (data: FormData): Promise<string> => {
 
 export const generateGuestMessage = async (style: string, guestName: string): Promise<string> => {
   try {
+    // Local fixed template for the 'flower' (上車舞) style per product requirement
+    if (style === 'flower') {
+      const shortName = (guestName || 'XX').split(/\s+/)[0];
+      return `${shortName}哥哥（姊姊），我們來接你了唷！ 來囉來囉～ 帥～好帥～ ${shortName}哥哥（姊姊）無敵帥！ 哇賽哇賽～ ${shortName}哥哥（姊姊）腹肌有八塊！ 掰掰～我們下車囉！`;
+    }
     const ai = getAiClient();
     let stylePrompt = "";
     // INTENSIFIED STYLES
@@ -95,19 +100,33 @@ export const generateGuestMessage = async (style: string, guestName: string): Pr
       case 'rap':
         stylePrompt = "用饒舌(Rap)的風格，要有押韻(Rhyme)、節奏感，用 Yo Yo Check it out 開頭，帥氣地祝福新人。";
         break;
+      case 'movie':
+        stylePrompt = "像經典電影台詞般充滿戲劇張力。引用或改寫著名的愛情電影對白，賦予這段婚姻史詩般的色彩。";
+        break;
+      case 'slang':
+        stylePrompt = "使用台灣Z世代網路流行語（如：原地結婚、太狠了、超派、暈爛），加上大量 Emoji，風格要很 Chill、很年輕。";
+        break;
+      case 'chengyu':
+        stylePrompt = "連續使用多個吉祥成語串聯，組成排比句，展現傳統文學底蘊，字字珠璣，喜氣洋洋。";
+        break;
+      case 'flower':
+        stylePrompt = "模仿 Jisoo《FLOWER》開花舞的迷因節奏。重點是那個『頓點』要非常明顯、斷斷續續！請大量使用『...』來表現機器人般的舞步節拍（例如：紅色的... 炸彈... 留下了... 祝福... 🌹）。一定要提到『花香』、『開花』或『轉圈』，語氣要很魔性、很洗腦，像中毒一樣。";
+        break;
       default: 
         stylePrompt = "真誠且禮貌的祝福。";
     }
 
-    // Simplified prompt structure for better speed
+    // Include a timestamp or random element in the prompt implicitly by asking for 'a new unique' message each time
     const prompt = `
-      Write a wedding wish in Traditional Chinese (Taiwan) for Red & Claire.
+      Task: Write a short wedding wish in Traditional Chinese (Taiwan) for Red (仁德) & Claire (雯惠).
       
       Guest Name: ${guestName || 'Friend'}
-      Style: ${stylePrompt}
+      Style Requirement: ${stylePrompt}
       
-      Keep it short (under 40 words).
-      Output ONLY the message text.
+      Constraints:
+      - Keep it under 50 words.
+      - Be creative and specific to the requested style.
+      - Do not output explanations, just the message content.
     `;
 
     const response = await ai.models.generateContent({
