@@ -56,7 +56,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
 
   const handleResetImage = () => {
     localStorage.removeItem('custom_header_image');
-    onUpdateImage('1.png');
+    // Default to file based cover.jpg
+    onUpdateImage('./cover.jpg'); 
   };
 
   const handleConfirmClear = () => {
@@ -162,16 +163,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
         {/* Cover Image Settings */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Cover Image Settings</h3>
+           
+           <div className="bg-blue-50 text-blue-800 p-3 rounded mb-4 text-sm">
+             <p className="font-bold">如何設定全體賓客預設照片 (Setup Global Default Photo):</p>
+             <p>請將您的婚紗照命名為 <code>cover.jpg</code> 並放入專案的 <code>public</code> 資料夾中。</p>
+             <p>Please place a file named <code>cover.jpg</code> in the public folder. It will be used as the default for everyone.</p>
+           </div>
+
            <div className="flex flex-col md:flex-row gap-6 items-start">
               <div 
                 className="w-full md:w-64 h-32 bg-cover bg-center rounded-lg border border-gray-200"
                 style={{ backgroundImage: `url('${currentImage}')` }}
               ></div>
               <div className="flex-1">
-                 <p className="text-sm text-gray-600 mb-2">Upload a new photo to replace the form header (max 4MB).</p>
+                 <p className="text-sm text-gray-600 mb-2">上傳「僅限這台電腦」看到的暫時預覽圖 (Local Preview Override):</p>
                  <div className="flex items-center gap-3 flex-wrap">
                    <label className="bg-rose-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-rose-600 transition-colors shadow-sm text-sm">
-                      Upload New Image
+                      Upload Preview Image
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -183,7 +191,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
                     onClick={handleResetImage}
                     className="text-gray-500 hover:text-gray-700 text-sm underline"
                    >
-                     Reset to Default
+                     Reset to Default (cover.jpg)
                    </button>
                  </div>
                  {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}

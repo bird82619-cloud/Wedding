@@ -28,7 +28,11 @@ const App: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(INITIAL_DATA);
   const [status, setStatus] = useState<FormStatus>(FormStatus.IDLE);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [headerImage, setHeaderImage] = useState('1.png');
+  
+  // Update: Default to cover.jpg, fallback to gradient if missing
+  const [headerImage, setHeaderImage] = useState('./cover.jpg');
+  const [imageError, setImageError] = useState(false);
+
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [aiLoading, setAiLoading] = useState(false);
   
@@ -45,6 +49,7 @@ const App: React.FC = () => {
     const savedImage = localStorage.getItem('custom_header_image');
     if (savedImage) {
       setHeaderImage(savedImage);
+      setImageError(false); // Reset error if user has a custom override
     }
   }, []);
 
@@ -239,7 +244,16 @@ const App: React.FC = () => {
   };
 
   if (showAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} currentImage={headerImage} onUpdateImage={setHeaderImage} />;
+    return (
+      <AdminDashboard 
+        onBack={() => setShowAdmin(false)} 
+        currentImage={headerImage} 
+        onUpdateImage={(newImg) => {
+          setHeaderImage(newImg);
+          setImageError(false); // Reset error if admin updates image
+        }} 
+      />
+    );
   }
 
   if (status === FormStatus.COMPLETED) {
@@ -272,14 +286,19 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-12 fade-in relative">
       {/* Header Image */}
       <div className="relative h-64 md:h-80 bg-gray-200 overflow-hidden shadow-sm">
-         {headerImage === '1.png' ? (
+         {imageError ? (
            <div className="w-full h-full bg-gradient-to-br from-rose-50 to-orange-50 flex items-center justify-center">
               <div className="text-center p-4">
                  <p className="font-serif text-4xl text-gray-400 opacity-20 italic">Wedding</p>
               </div>
            </div>
          ) : (
-           <img src={headerImage} alt="Wedding Header" className="w-full h-full object-cover" />
+           <img 
+             src={headerImage} 
+             alt="Wedding Header" 
+             className="w-full h-full object-cover" 
+             onError={() => setImageError(true)}
+           />
          )}
       </div>
 
