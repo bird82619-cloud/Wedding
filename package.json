@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Wedding RSVP App",
   "license": "MIT",
-  "homepage": "https://bird82619-cloud.github.io/wedding-rsvp",
+  "homepage": "https://bird82619-cloud.github.io/Wedding",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

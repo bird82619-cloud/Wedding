@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    base: './', // Ensures relative paths for assets on GitHub Pages
+    base: '/Wedding/', // Ensures correct paths for assets on GitHub Pages
     build: {
       outDir: 'dist',
     },

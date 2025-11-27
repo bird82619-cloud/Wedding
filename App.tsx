@@ -30,7 +30,7 @@ const App: React.FC = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   
   // Update: Default to cover.jpg, fallback to gradient if missing
-  const [headerImage, setHeaderImage] = useState('./cover.jpg');
+  const [headerImage, setHeaderImage] = useState('/Wedding/cover.jpg');
   const [imageError, setImageError] = useState(false);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
