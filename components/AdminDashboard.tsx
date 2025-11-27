@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { FormData } from '../types';
 
@@ -7,11 +8,18 @@ interface AdminDashboardProps {
   onUpdateImage: (newImage: string) => void;
 }
 
-const ADMIN_PASSCODE = '82619';
+const ADMIN_PASSCODE = 'Rende0619';
+// Use Thumbnail endpoint for better reliability
+const DEFAULT_COVER_IMAGE = 'https://drive.google.com/thumbnail?id=1KDgpd69CoXUg9AMNP89oYyraYo4jLrQ_&sz=w2560';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentImage, onUpdateImage }) => {
   const [data, setData] = useState<FormData[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // State for Clear Data Modal
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearPassword, setClearPassword] = useState('');
+  const [clearError, setClearError] = useState('');
 
   useEffect(() => {
     try {
@@ -29,7 +37,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Size limit check (approx 4MB) to be safe with LocalStorage limits
+    // Size limit check (approx 4MB)
     if (file.size > 4 * 1024 * 1024) {
       setErrorMsg("Image is too large. Please select an image under 4MB.");
       return;
@@ -40,7 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
       const base64String = reader.result as string;
       try {
         localStorage.setItem('custom_header_image', base64String);
-        onUpdateImage(base64String); // Instant update in parent
+        onUpdateImage(base64String); // Instant update
       } catch (e) {
         setErrorMsg("Failed to save image. It might be too large for browser storage.");
         console.error("Storage failed", e);
@@ -51,18 +59,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
 
   const handleResetImage = () => {
     localStorage.removeItem('custom_header_image');
-    onUpdateImage('1.png');
+    // Default to the provided Google Drive link
+    onUpdateImage(DEFAULT_COVER_IMAGE); 
   };
 
-  const handleClearData = () => {
-    const input = window.prompt("請輸入管理員密碼以確認清除所有資料 (Enter password to clear ALL data):");
-    if (input === ADMIN_PASSCODE) {
-      if (window.confirm("確定要刪除所有資料嗎？此動作無法復原。\nAre you sure? This cannot be undone.")) {
+  const handleConfirmClear = () => {
+    if (clearPassword === ADMIN_PASSCODE) {
+      // Removing window.confirm to prevent stuck UI on mobile browsers.
+      // The password entry itself is sufficient confirmation for this danger zone.
+      try {
         localStorage.removeItem('wedding_rsvps');
         setData([]);
+        setShowClearModal(false);
+        setClearPassword('');
+        setClearError('');
+      } catch (e) {
+        console.error("Failed to clear data", e);
+        setClearError("清除失敗，請重試");
       }
-    } else if (input !== null) {
-      alert("密碼錯誤 (Incorrect password).");
+    } else {
+      setClearError("密碼錯誤 (Incorrect password)");
     }
   };
 
@@ -115,30 +131,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans fade-in">
+    <div className="min-h-screen bg-gray-50 p-2 md:p-8 font-sans fade-in">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <h2 className="text-3xl font-serif text-gray-800">Admin Dashboard</h2>
-          <div className="space-x-4">
+          <div className="flex flex-wrap gap-2">
             <button 
               onClick={onBack}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors border rounded bg-white"
             >
-              Back to Form
+              Back
             </button>
             <button 
-              onClick={handleClearData}
-              className="bg-red-500 text-white px-6 py-2 rounded shadow hover:bg-red-600 transition-colors inline-flex items-center gap-2"
+              onClick={() => {
+                setShowClearModal(true);
+                setClearPassword('');
+                setClearError('');
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition-colors inline-flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
               Clear Data
             </button>
             <button 
               onClick={handleExport}
-              className="bg-green-600 text-white px-6 py-2 rounded shadow hover:bg-green-700 transition-colors inline-flex items-center gap-2"
+              className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 transition-colors inline-flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              Export & Email
+              Export CSV
             </button>
           </div>
         </div>
@@ -146,16 +166,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
         {/* Cover Image Settings */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
            <h3 className="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Cover Image Settings</h3>
+           
+           <div className="bg-blue-50 text-blue-800 p-3 rounded mb-4 text-sm">
+             <p className="font-bold">預設照片 (Default Photo):</p>
+             <p>目前已設定為使用 Google Drive 連結。</p>
+             <p>Currently using direct link from Google Drive.</p>
+           </div>
+
            <div className="flex flex-col md:flex-row gap-6 items-start">
-              <div 
-                className="w-full md:w-64 h-32 bg-cover bg-center rounded-lg border border-gray-200"
-                style={{ backgroundImage: `url('${currentImage}')` }}
-              ></div>
+              {/* Use img tag with no-referrer policy to handle Google Drive links properly */}
+              <div className="w-full md:w-64 h-32 rounded-lg border border-gray-200 overflow-hidden bg-gray-100 relative">
+                 <img 
+                   src={currentImage} 
+                   alt="Header Preview" 
+                   className="w-full h-full object-cover"
+                   referrerPolicy="no-referrer"
+                   onError={(e) => {
+                     // Fallback visualization if broken
+                     e.currentTarget.style.display = 'none';
+                     e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                     if(e.currentTarget.parentElement) {
+                       e.currentTarget.parentElement.innerHTML = '<span class="text-xs text-gray-400">Image not available</span>';
+                     }
+                   }}
+                 />
+              </div>
               <div className="flex-1">
-                 <p className="text-sm text-gray-600 mb-2">Upload a new photo to replace the form header (max 4MB).</p>
-                 <div className="flex items-center gap-3">
-                   <label className="bg-rose-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-rose-600 transition-colors shadow-sm">
-                      Upload New Image
+                 <p className="text-sm text-gray-600 mb-2">上傳「僅限這台電腦」看到的暫時預覽圖 (Local Preview Override):</p>
+                 <div className="flex items-center gap-3 flex-wrap">
+                   <label className="bg-rose-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-rose-600 transition-colors shadow-sm text-sm">
+                      Upload Preview Image
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -167,7 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
                     onClick={handleResetImage}
                     className="text-gray-500 hover:text-gray-700 text-sm underline"
                    >
-                     Reset to Default
+                     Reset to Default (Google Drive)
                    </button>
                  </div>
                  {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}
@@ -183,8 +223,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {["Name", "Relation", "Status", "Phone", "人數 (Adults)", "兒童 (Kids)", "素食 (Veg)", "Message"].map(h => (
-                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {["Name", "Email", "Relation", "Status", "Phone", "Adults", "Kids", "Veg", "Message"].map(h => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -193,7 +233,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
             <tbody className="bg-white divide-y divide-gray-200">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     No data found yet.
                   </td>
                 </tr>
@@ -202,7 +242,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
                   <tr key={idx} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{row.fullName}</div>
-                      <div className="text-sm text-gray-500">{row.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline cursor-pointer select-all">
+                      <a href={`mailto:${row.email}`}>{row.email}</a>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {row.relationship}
@@ -236,6 +278,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
           </table>
         </div>
       </div>
+
+      {/* Clear Data Modal */}
+      {showClearModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-xs border border-red-100">
+             <h3 className="text-lg font-bold text-red-600 mb-2">危險動作 (Danger Zone)</h3>
+             <p className="text-sm text-gray-600 mb-4">
+               請輸入密碼以確認清除所有資料。<br/>
+               Enter password to clear ALL data.
+             </p>
+             <input
+                type="password"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 mb-2 focus:ring-2 focus:ring-red-300 outline-none"
+                placeholder="Password"
+                value={clearPassword}
+                onChange={(e) => setClearPassword(e.target.value)}
+             />
+             {clearError && <p className="text-red-500 text-xs mb-3">{clearError}</p>}
+             <div className="flex gap-2 mt-2">
+               <button
+                 onClick={() => setShowClearModal(false)}
+                 className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={handleConfirmClear}
+                 className="flex-1 bg-red-500 text-white font-medium py-2 rounded-lg hover:bg-red-600 transition-colors"
+               >
+                 Confirm Clear
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
