@@ -118,13 +118,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBack, currentI
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    // 3. Open Email Client
-    setTimeout(() => {
-      const subject = encodeURIComponent("Wedding Guest Data Export");
-      const body = encodeURIComponent("Please see the attached CSV file containing the latest wedding RSVP data.\n\n(Note: You must manually attach the downloaded file to this email).");
-      window.location.href = `mailto:bird82619@gmail.com?subject=${subject}&body=${body}`;
-    }, 1000);
+    
+    // Clean up the object URL
+    URL.revokeObjectURL(url);
   };
 
   return (
