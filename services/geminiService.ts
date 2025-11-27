@@ -4,30 +4,36 @@ import { FormData } from "../types";
 // Helper to safely get the AI client
 // We initialize it lazily so the app doesn't crash on startup if the key is missing/undefined
 const getAiClient = () => {
-  // Try multiple sources for the API key (in priority order)
-  const apiKey = 
-    (window as any).API_CONFIG?.VITE_API_KEY ||  // From api-config.js (loaded in <head>)
-    (window as any).VITE_API_KEY ||  // Fallback: direct global variable
-    (import.meta as any).env.VITE_API_KEY ||  // From Vite env
-    process.env.VITE_API_KEY;  // From process env (development)
-  
+  const { apiKey } = detectApiKeySource();
   if (!apiKey) {
-    console.error("VITE_API_KEY is not set. AI features will not work.", {
+    const sources = {
       apiConfigKey: (window as any).API_CONFIG?.VITE_API_KEY,
       windowKey: (window as any).VITE_API_KEY,
-      importMeta: (import.meta as any).env.VITE_API_KEY,
+      importMeta: (import.meta as any).env?.VITE_API_KEY,
       processEnv: process.env.VITE_API_KEY
-    });
+    };
+    console.error("VITE_API_KEY is not set. AI features will not work.", sources);
     throw new Error("API Key is missing");
   }
-  
-  console.log("[Gemini] Using API Key from:", 
-    (window as any).API_CONFIG?.VITE_API_KEY ? "API_CONFIG" :
-    (window as any).VITE_API_KEY ? "window.VITE_API_KEY" :
-    (import.meta as any).env.VITE_API_KEY ? "import.meta.env" :
-    "process.env"
-  );
   return new GoogleGenAI({ apiKey });
+};
+
+/**
+ * Detect which source contains the API key. Returns an object with
+ * - source: one of 'api-config', 'window', 'import.meta', 'process', or null
+ * - apiKey: the raw key (if present)
+ * - masked: masked version safe for logs
+ */
+export const detectApiKeySource = () => {
+  const rawApiConfig = (window as any).API_CONFIG?.VITE_API_KEY;
+  const rawWindow = (window as any).VITE_API_KEY;
+  const rawImport = (import.meta as any).env?.VITE_API_KEY;
+  const rawProcess = process.env.VITE_API_KEY;
+
+  const apiKey = rawApiConfig || rawWindow || rawImport || rawProcess || null;
+  const source = rawApiConfig ? 'api-config' : rawWindow ? 'window' : rawImport ? 'import.meta' : rawProcess ? 'process' : null;
+  const masked = apiKey ? (typeof apiKey === 'string' && apiKey.length > 8 ? apiKey.slice(0,4) + '...' + apiKey.slice(-4) : '*****') : null;
+  return { source, apiKey, masked };
 };
 
 export const generateEmailSummary = async (data: FormData): Promise<string> => {
@@ -86,6 +92,8 @@ export const generateEmailSummary = async (data: FormData): Promise<string> => {
 export const generateGuestMessage = async (style: string, guestName: string): Promise<string> => {
   try {
     const ai = getAiClient();
+    const keyInfo = detectApiKeySource();
+    console.log('[Gemini] generateGuestMessage using key source:', keyInfo.source, 'masked:', keyInfo.masked);
     let prompt = "";
     const name = guestName || '我';
     // Add a random seed to force new generation every time
@@ -168,9 +176,16 @@ export const generateGuestMessage = async (style: string, guestName: string): Pr
       contents: prompt,
     });
 
+    // Log response shape for debugging (do not log raw text in prod)
+    console.log('[Gemini] response keys:', Object.keys(response || {}));
     return response.text?.trim() || "祝你們百年好合！";
   } catch (error) {
+    // Provide more detailed error in console for debugging while keeping friendly fallback
     console.error("Error generating message:", error);
-    return "新婚快樂，永浴愛河！";
+    // If missing API key, communicate that specifically
+    if (error && (error.message || '').toLowerCase().includes('api key')) {
+      throw new Error('NO_API_KEY');
+    }
+    throw new Error('AI_ERROR');
   }
 };

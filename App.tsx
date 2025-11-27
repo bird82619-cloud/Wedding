@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FormCard } from './components/FormCard';
 import { AdminDashboard } from './components/AdminDashboard';
-import { generateGuestMessage } from './services/geminiService';
+import { generateGuestMessage, detectApiKeySource } from './services/geminiService';
 import { FormData, FormStatus } from './types';
 
 // Admin passcode from requirements
@@ -140,11 +140,32 @@ const App: React.FC = () => {
     
     setAiLoading(true);
     try {
-      const msg = await generateGuestMessage(style, formData.fullName);
-      setFormData(prev => ({ ...prev, comments: msg }));
+        // Log and show info about API key source for debugging
+        try {
+          const info = detectApiKeySource();
+          console.log('[DEBUG] API key source:', info.source, 'masked:', info.masked);
+          if (!info.source) {
+            alert('AI 功能目前無法使用：找不到 API Key（請稍候或聯絡管理員）');
+            setAiLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.warn('[DEBUG] detectApiKeySource failed', err);
+        }
+
+        const msg = await generateGuestMessage(style, formData.fullName);
+        setFormData(prev => ({ ...prev, comments: msg }));
     } catch (e) {
-      console.error(e);
-      alert("AI 產生失敗，請稍後再試");
+        console.error('[AI] generateGuestMessage error:', e);
+        // Show clearer message depending on error
+        const errMsg = (e instanceof Error) ? e.message : String(e);
+        if (errMsg === 'NO_API_KEY') {
+          alert('AI Key 不存在或載入失敗（請稍後或重新整理頁面）');
+        } else if (errMsg === 'AI_ERROR') {
+          alert('AI 產生失敗，伺服器回應異常，請稍後再試');
+        } else {
+          alert('AI 產生失敗，請檢查開發者主控台 (Console) 以獲得詳細資訊');
+        }
     } finally {
       setAiLoading(false);
     }
