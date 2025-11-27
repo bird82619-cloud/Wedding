@@ -4,9 +4,12 @@ import { FormData } from "../types";
 // Helper to safely get the AI client
 // We initialize it lazily so the app doesn't crash on startup if the key is missing/undefined
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
+  // Try to get the API key from import.meta.env (works in production on GitHub Pages)
+  // Fall back to process.env for development
+  const apiKey = (import.meta as any).env.VITE_API_KEY || process.env.VITE_API_KEY || (window as any).VITE_API_KEY;
+  
   if (!apiKey) {
-    console.warn("API_KEY is not set. AI features will not work.");
+    console.warn("VITE_API_KEY is not set. AI features will not work.");
     throw new Error("API Key is missing");
   }
   return new GoogleGenAI({ apiKey });
