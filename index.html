@@ -3,16 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>仁德 & 雯惠 Wedding RSVP</title>
+    
+    <!-- Critical for Google Drive images to load correctly across all browsers -->
+    <meta name="referrer" content="no-referrer" />
+    
+    <!-- Anti-Caching Headers for Mobile Browsers -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <title>仁德&雯惠 婚禮出席調查</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <style>
       body {
         font-family: 'Lato', sans-serif;
-        background-color: #fcfaf8;
-        background-image: radial-gradient(#e7e5e4 1px, transparent 1px);
+        min-height: 100vh;
+        
+        /* Romantic Pink Polka Dot Background */
+        background-color: #fff0f5;
+        background-image:  radial-gradient(#eec0c6 1.5px, transparent 1.5px), radial-gradient(#eec0c6 1.5px, transparent 1.5px);
         background-size: 24px 24px;
+        background-position: 0 0, 12px 12px;
+        background-attachment: fixed;
       }
+      
       h1, h2, h3, .serif-font {
         font-family: 'Playfair Display', serif;
       }
@@ -32,16 +47,14 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "vite": "https://aistudiocdn.com/vite@^7.2.4",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
-  <script type="module" crossorigin src="./assets/index-DIpoS3T0.js"></script>
+  <script type="module" crossorigin src="./assets/index.D8g7DMEC.js"></script>
 </head>
   <body>
     <div id="root"></div>
-    <!-- Change /index.tsx to ./index.tsx to support subdirectory deployment -->
 </body>
 </html>
